@@ -1,0 +1,20 @@
+{
+  "name": "gen-gen-gen",
+  "version": "0.5.0",
+  "description": "Generates code without any assumptions (wraps YAML config + CLI + Handlebars)",
+  "main": "gen-gen-gen.js",
+  "bin": { "gen-gen-gen": "./gen-gen-gen.js"},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gyulalaszlo/gen-gen-gen.git"
+  },
+  "author": "Gyula Laszlo",
+  "license": "BSD-3-Clause",
+  "bugs": {
+    "url": "https://github.com/gyulalaszlo/gen-gen-gen/issues"
+  },
+  "homepage": "https://github.com/gyulalaszlo/gen-gen-gen#readme"
+}
