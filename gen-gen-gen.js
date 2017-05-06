@@ -6,41 +6,49 @@ let fs         = require('fs');
 let path       = require('path');
 
 
+// Helpers -------------
+require('./helpers')
+    .registerHelpers([require('./helpers/joinUsing')
+
+                     ]);
+
+
+
 Handlebars.registerHelper('lowerFirst', str => str.length > 0 ? str[0].toLowerCase() + str.substr(1) : str);
 Handlebars.registerHelper('upperFirst', str => str.length > 0 ? str[0].toUpperCase() + str.substr(1) : str);
-Handlebars.registerHelper('json', v => JSON.stringify(v));
+Handlebars.registerHelper('json', v => new Handlebars.SafeString(JSON.stringify(v)));
 Handlebars.registerHelper('length', v => Array.isArray(v) ? v.length : Object.keys(v).length);
-Handlebars.registerHelper('at', (k,v) => v ? v[k] : "");
-Handlebars.registerHelper('join', joinUsing);
-
-
-function joinUsing(els=[], opts) {
-    if (typeof els === "undefined" || els === null) {
-        return "";
-    }
-    if (typeof opts === "undefined") opts = els || {};
-
-    let {hash={}} = opts;
-    let { first="",last="",joiner="", lines=false} = hash;
-    let vals = [];
-
-    if (Array.isArray(els)) {
-        vals = els.map((k,i) => { return { key: i, value: k }; });
-    } else {
-        vals = Object.keys(els).map(k => { return { "key": k, "value": els[k] }; });
-    }
-    function innerFn(val) {
-        return opts.fn ?
-            opts.fn(val, {data: opts.data, blockParams: [val.key, val.value]})
-            : val.value;
-
-    //     // return fn(val);
-    }
-
-
-    let joinStr = (lines ? "" : "\n") + joiner;
-    return first + vals.map(innerFn).join(joinStr) + last;
-}
+Handlebars.registerHelper('at', (k, v) => v ? v[k] : "");
+// Handlebars.registerHelper('join', joinUsing);
+//
+//
+// function joinUsing(els=[], opts) {
+//     if (typeof els === "undefined" || els === null) {
+//         return "";
+//     }
+//     if (typeof opts === "undefined") opts = els || {};
+//
+//     let {hash={}} = opts;
+//     let { first="",last="",joiner="", lines=false} = hash;
+//     let vals = [];
+//
+//     if (Array.isArray(els)) {
+//         vals = els.map((k,i) => { return { key: i, value: k }; });
+//     } else {
+//         vals = Object.keys(els).map(k => { return { "key": k, "value": els[k] }; });
+//     }
+//     function innerFn(val) {
+//         return opts.fn ?
+//             opts.fn(val, {data: opts.data, blockParams: [val.key, val.value]})
+//             : val.value;
+//
+//     //     // return fn(val);
+//     }
+//
+//
+//     let joinStr = (lines ? "" : "\n") + joiner;
+//     return first + vals.map(innerFn).join(joinStr) + last;
+// }
 
 program
     .version('0.5.0')
@@ -58,7 +66,10 @@ main(program)
     .then(v => console.log(["OK", v]))
     .catch(err => {
         console.error([err.name, err.message, err.toString()]);
-        if (err.stack) { console.error("\n", err.stack); } });
+        if (err.stack) {
+            console.error("\n", err.stack);
+        }
+    });
 
 //////////////////////////////////////////////////////////////////////
 
@@ -93,7 +104,13 @@ function main(program) {
 function readGenFile(genfilePath) {
     // return new Promise((ok, fail) => {
     let reducer = (memo, f) => memo.concat(mapOutputs(f));
-    let tc = f => a => { try { return Promise.resolve(f(a)); } catch(e) { return Promise.reject(e); } };
+    let tc      = f => a => {
+        try {
+            return Promise.resolve(f(a));
+        } catch (e) {
+            return Promise.reject(e);
+        }
+    };
     // try {
     //     genData =
     // } catch (e) {
@@ -107,7 +124,7 @@ function readGenFile(genfilePath) {
     // ok(Promise.all(genData.reduce((memo, f) => memo.concat(mapOutputs(f)), [])));
 
     return Promise.resolve(tc(f => YAML.load(f))(genfilePath))
-           .then(data => Promise.all(data.reduce(reducer, [])));
+                  .then(data => Promise.all(data.reduce(reducer, [])));
     // });
 }
 
