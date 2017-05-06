@@ -16,5 +16,10 @@
   "bugs": {
     "url": "https://github.com/gyulalaszlo/gen-gen-gen/issues"
   },
-  "homepage": "https://github.com/gyulalaszlo/gen-gen-gen#readme"
+  "homepage": "https://github.com/gyulalaszlo/gen-gen-gen#readme",
+  "dependencies": {
+    "commander": "^2.9.0",
+    "handlebars": "^4.0.8",
+    "yamljs": "^0.2.10"
+  }
 }

@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 let program    = require('commander');
 let YAML       = require('yamljs');
 // let R = require('ramda');
