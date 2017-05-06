@@ -11,7 +11,36 @@ Handlebars.registerHelper('upperFirst', str => str.length > 0 ? str[0].toUpperCa
 Handlebars.registerHelper('json', v => JSON.stringify(v));
 Handlebars.registerHelper('length', v => Array.isArray(v) ? v.length : Object.keys(v).length);
 Handlebars.registerHelper('at', (k,v) => v ? v[k] : "");
+Handlebars.registerHelper('join', joinUsing);
 
+
+function joinUsing(els=[], opts) {
+    if (typeof els === "undefined" || els === null) {
+        return "";
+    }
+    if (typeof opts === "undefined") opts = els || {};
+
+    let {hash={}} = opts;
+    let { first="",last="",joiner="", lines=false} = hash;
+    let vals = [];
+
+    if (Array.isArray(els)) {
+        vals = els.map((k,i) => { return { key: i, value: k }; });
+    } else {
+        vals = Object.keys(els).map(k => { return { "key": k, "value": els[k] }; });
+    }
+    function innerFn(val) {
+        return opts.fn ?
+            opts.fn(val, {data: opts.data, blockParams: [val.key, val.value]})
+            : val.value;
+
+    //     // return fn(val);
+    }
+
+
+    let joinStr = (lines ? "" : "\n") + joiner;
+    return first + vals.map(innerFn).join(joinStr) + last;
+}
 
 program
     .version('0.5.0')
