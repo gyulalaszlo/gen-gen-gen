@@ -6,11 +6,11 @@ let fs         = require('fs');
 let path       = require('path');
 
 
-
 Handlebars.registerHelper('lowerFirst', str => str.length > 0 ? str[0].toLowerCase() + str.substr(1) : str);
 Handlebars.registerHelper('upperFirst', str => str.length > 0 ? str[0].toUpperCase() + str.substr(1) : str);
 Handlebars.registerHelper('json', v => JSON.stringify(v));
 Handlebars.registerHelper('length', v => Array.isArray(v) ? v.length : Object.keys(v).length);
+Handlebars.registerHelper('at', (k,v) => v ? v[k] : "");
 
 
 program
@@ -20,14 +20,16 @@ program
     .option('-j --json <json>', "Define local variables as json", JSON.parse, {})
     .option('-g --genfile <json>', "Use the specific genfile")
     .option('-r --replace <key>',
-            "Dont overwrite the output file, but replace anything matching {{{<key>}}}. Default: yield", 'yield')
+            "Dont overwrite the output file, but replace anything " + "matching {{{<key>}}}. Default: yield", 'yield')
     .option("-o, --output <file>", "Set the output file", '')
     .parse(process.argv);
 
 
 main(program)
     .then(v => console.log(["OK", v]))
-    .catch(console.error);
+    .catch(err => {
+        console.error([err.name, err.message, err.toString()]);
+        if (err.stack) { console.error("\n", err.stack); } });
 
 //////////////////////////////////////////////////////////////////////
 
@@ -37,6 +39,12 @@ function collectPairs(val, memo) {
         memo[k] = v;
     }
     return memo;
+}
+
+// from:
+// https://developer.mozilla.org/en/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce
+function flatten(arr) {
+    return arr.reduce((acc, val) => acc.concat(Array.isArray(val) ? flatten(val) : val), []);
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -54,10 +62,24 @@ function main(program) {
 //////////////////////////////////////////////////////////////////////
 
 function readGenFile(genfilePath) {
-    let genData         = YAML.load(genfilePath);
-    let genSingleOutput = (inputs, output, data) => replaceFile(output, data, inputs);
+    // return new Promise((ok, fail) => {
+    let reducer = (memo, f) => memo.concat(mapOutputs(f));
+    let tc = f => a => { try { return Promise.resolve(f(a)); } catch(e) { return Promise.reject(e); } };
+    // try {
+    //     genData =
+    // } catch (e) {
+    //     return fail(e);
+    // }
+    // if (!genData) return fail(new Error("Empty data"));
+
+    let genSingleOutput = (inputs, output, data) => replaceFile(output, data, flatten(inputs));
     let mapOutputs      = o => Object.keys(o.outputs).map((k) => genSingleOutput(o.inputs, k, o.outputs[k]));
-    return Promise.all(genData.reduce((memo, f) => memo.concat(mapOutputs(f)), []));
+
+    // ok(Promise.all(genData.reduce((memo, f) => memo.concat(mapOutputs(f)), [])));
+
+    return Promise.resolve(tc(f => YAML.load(f))(genfilePath))
+           .then(data => Promise.all(data.reduce(reducer, [])));
+    // });
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -74,8 +96,10 @@ function replaceContent(fileName) {
     });
 }
 
+
 function readTextFile(f) {
     return new Promise((resolve, reject) => {
+
         fs.readFile(f, "utf-8", (err, res) => {
             if (err) {
                 return reject(err);
@@ -86,21 +110,21 @@ function readTextFile(f) {
 }
 
 function template(data) {
-    return text => new Promise((resolve, reject) => {
-        let result = "";
+    return text => {
+        let result = false;
         try {
-            let tpl = Handlebars.compile(text);
-            result  = tpl(data);
+            result = Handlebars.compile(text)(data);
         } catch (e) {
-            return reject(e);
+            return Promise.reject(e);
         }
-        return resolve(result);
-    });
+        return Promise.resolve(result);
+    };
 }
 
 
 function replaceFile(output, data, inFiles) {
-    return Promise.all(inFiles.map(readTextFile))
+    let files = inFiles.map(readTextFile);
+    return Promise.all(files)
                   .then(bs => bs.join("\n\n"))
                   .then(template(data))
                   .then(replaceContent(output))
