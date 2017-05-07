@@ -5,13 +5,11 @@ let Handlebars = require('handlebars');
 let fs         = require('fs');
 let path       = require('path');
 
-
 // Helpers -------------
+let helpers = [ require('./helpers/joinUsing'), require('./helpers/nTimes') ];
+
 require('./helpers')
-    .registerHelpers([require('./helpers/joinUsing')
-
-                     ]);
-
+    .registerHelpers(helpers);
 
 
 Handlebars.registerHelper('lowerFirst', str => str.length > 0 ? str[0].toLowerCase() + str.substr(1) : str);
