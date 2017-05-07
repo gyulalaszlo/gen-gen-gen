@@ -44,6 +44,10 @@ module.exports = {
             return "";
         }
 
+        if (typeof els === "string") {
+            els = [els]
+        }
+
         if (typeof opts === "undefined") opts = els || {};
         let h     = opts.hash || {};
         let first = h.first || "";
