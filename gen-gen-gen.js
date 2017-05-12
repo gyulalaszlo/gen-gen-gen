@@ -5,8 +5,11 @@ let Handlebars = require('handlebars');
 let fs         = require('fs');
 let path       = require('path');
 
+let replaceContent = require("./lib/replaceContent");
+let readTextFile   = require("./lib/readTextFile");
+
 // Helpers -------------
-let helpers = [ require('./helpers/joinUsing'), require('./helpers/nTimes') ];
+let helpers = [require('./helpers/joinUsing'), require('./helpers/nTimes')];
 
 require('./helpers')
     .registerHelpers(helpers);
@@ -17,36 +20,6 @@ Handlebars.registerHelper('upperFirst', str => str.length > 0 ? str[0].toUpperCa
 Handlebars.registerHelper('json', v => new Handlebars.SafeString(JSON.stringify(v)));
 Handlebars.registerHelper('length', v => Array.isArray(v) ? v.length : Object.keys(v).length);
 Handlebars.registerHelper('at', (k, v) => v ? v[k] : "");
-// Handlebars.registerHelper('join', joinUsing);
-//
-//
-// function joinUsing(els=[], opts) {
-//     if (typeof els === "undefined" || els === null) {
-//         return "";
-//     }
-//     if (typeof opts === "undefined") opts = els || {};
-//
-//     let {hash={}} = opts;
-//     let { first="",last="",joiner="", lines=false} = hash;
-//     let vals = [];
-//
-//     if (Array.isArray(els)) {
-//         vals = els.map((k,i) => { return { key: i, value: k }; });
-//     } else {
-//         vals = Object.keys(els).map(k => { return { "key": k, "value": els[k] }; });
-//     }
-//     function innerFn(val) {
-//         return opts.fn ?
-//             opts.fn(val, {data: opts.data, blockParams: [val.key, val.value]})
-//             : val.value;
-//
-//     //     // return fn(val);
-//     }
-//
-//
-//     let joinStr = (lines ? "" : "\n") + joiner;
-//     return first + vals.map(innerFn).join(joinStr) + last;
-// }
 
 program
     .version('0.5.0')
@@ -57,17 +30,58 @@ program
     .option('-r --replace <key>',
             "Dont overwrite the output file, but replace anything " + "matching {{{<key>}}}. Default: yield", 'yield')
     .option("-o, --output <file>", "Set the output file", '')
+
+
+program
+    .command('map [INPUT_FILES...]')
+    .description('Transform an input using script files')
+    .option('--js <js_module>', 'Add a javascript module to the transform chain', list, [])
+    .action((inputFiles, options) => {
+
+        if (options.js.length === 0) {
+            throw "At least one `--js SCRIPT_FILE` parameter is required";
+        }
+
+        let scripts     = options.js.map(script => code => require(script)(code, program));
+        let mapFile     = inputFile =>
+            readTextFile(inputFile)
+                .then(input => scripts.reduce((memo, fn) => fn(memo), input))
+                .then(replaceContent(inputFile));
+
+        let transformed = Promise.all(inputFiles.map(mapFile));
+
+        return wrapAction(transformed);
+    });
+
+
+program
+    .command('template [TEMPLATE_FILES...]')
+    .description("generate code using templates")
+    .action((templateFiles) => {
+        let single = (p) => {
+            if (!p.output) throw new Error("--output required when a single file is processed");
+            return replaceFile(p.output, Object.assign(p.json, p.define), p.args);
+        }
+
+        return (program.genfile) ? readGenFile(program.genfile) : single(program);
+
+    });
+
+
+program
     .parse(process.argv);
 
 
-main(program)
-    .then(v => console.log(["OK", v]))
-    .catch(err => {
-        console.error([err.name, err.message, err.toString()]);
-        if (err.stack) {
-            console.error("\n", err.stack);
-        }
-    });
+function wrapAction(promise) {
+    promise
+        .then(v => console.log("OK", v))
+        .catch(err => {
+            console.error([err.name, err.message, err.toString()]);
+            if (err.stack) {
+                console.error("\n", err.stack);
+            }
+        });
+}
 
 //////////////////////////////////////////////////////////////////////
 
@@ -79,23 +93,26 @@ function collectPairs(val, memo) {
     return memo;
 }
 
-// from:
-// https://developer.mozilla.org/en/docs/Web/JavaScript/Reference/Global_Objects/Array/reduce
+
+function list(val, memo) {
+    return memo.concat(val);
+}
+
 function flatten(arr) {
     return arr.reduce((acc, val) => acc.concat(Array.isArray(val) ? flatten(val) : val), []);
 }
 
 //////////////////////////////////////////////////////////////////////
 
-function main(program) {
-
-    let single = (p) => {
-        if (!p.output) throw new Error("--output required when a single file is processed");
-        return replaceFile(p.output, Object.assign(p.json, p.define), p.args);
-    }
-
-    return (program.genfile) ? readGenFile(program.genfile) : single(program);
-}
+//function main(program) {
+//
+//    let single = (p) => {
+//        if (!p.output) throw new Error("--output required when a single file is processed");
+//        return replaceFile(p.output, Object.assign(p.json, p.define), p.args);
+//    }
+//
+//    return (program.genfile) ? readGenFile(program.genfile) : single(program);
+//}
 
 //////////////////////////////////////////////////////////////////////
 
@@ -109,49 +126,43 @@ function readGenFile(genfilePath) {
             return Promise.reject(e);
         }
     };
-    // try {
-    //     genData =
-    // } catch (e) {
-    //     return fail(e);
-    // }
-    // if (!genData) return fail(new Error("Empty data"));
 
     let genSingleOutput = (inputs, output, data) => replaceFile(output, data, flatten(inputs));
     let mapOutputs      = o => Object.keys(o.outputs).map((k) => genSingleOutput(o.inputs, k, o.outputs[k]));
 
-    // ok(Promise.all(genData.reduce((memo, f) => memo.concat(mapOutputs(f)), [])));
-
     return Promise.resolve(tc(f => YAML.load(f))(genfilePath))
                   .then(data => Promise.all(data.reduce(reducer, [])));
-    // });
 }
 
 //////////////////////////////////////////////////////////////////////
+//
+//function replaceContent(fileName) {
+//
+//    return data => new Promise((resolve, reject) => {
+//        if (fs.existsSync(fileName) && fs.readFileSync(fileName, "utf-8") === data) {
+//            resolve(["same", fileName]);
+//        }
+//        fs.writeFile(fileName, data, "utf-8", (err) => {
+//            return err ? reject(err) : resolve(["written", fileName]);
+//        });
+//
+//    });
+//}
 
-function replaceContent(fileName) {
-    return data => new Promise((resolve, reject) => {
-        if (fs.existsSync(fileName) && fs.readFileSync(fileName, "utf-8") === data) {
-            resolve(["same", fileName]);
-        }
-        fs.writeFile(fileName, data, "utf-8", (err) => {
-            return err ? reject(err) : resolve(["written", fileName]);
-        });
 
-    });
-}
+//
 
-
-function readTextFile(f) {
-    return new Promise((resolve, reject) => {
-
-        fs.readFile(f, "utf-8", (err, res) => {
-            if (err) {
-                return reject(err);
-            }
-            resolve(res);
-        });
-    });
-}
+//function readTextFile(f) {
+//    return new Promise((resolve, reject) => {
+//
+//        fs.readFile(f, "utf-8", (err, res) => {
+//            if (err) {
+//                return reject(err);
+//            }
+//            resolve(res);
+//        });
+//    });
+//}
 
 function template(data) {
     return text => {

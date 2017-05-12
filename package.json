@@ -3,7 +3,9 @@
   "version": "0.5.0",
   "description": "Generates code without any assumptions (wraps YAML config + CLI + Handlebars)",
   "main": "gen-gen-gen.js",
-  "bin": { "gen-gen-gen": "./gen-gen-gen.js"},
+  "bin": {
+    "gen-gen-gen": "./gen-gen-gen.js"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "link-tool": "npm link ."
@@ -21,6 +23,7 @@
   "dependencies": {
     "commander": "^2.9.0",
     "handlebars": "^4.0.8",
+    "tcomb": "^3.2.20",
     "yamljs": "^0.2.10"
   }
 }
