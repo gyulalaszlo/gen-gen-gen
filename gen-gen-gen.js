@@ -42,14 +42,41 @@ program
             throw "At least one `--js SCRIPT_FILE` parameter is required";
         }
 
-        let scripts     = options.js.map(script => code => require(script)(code, program));
-        let mapFile     = inputFile =>
+        if (inputFiles.length === 0) {
+            throw "No input files";
+        }
+
+
+        // Load all scripts
+        let scripts = options.js.map(script => code => require(script)(code, program));
+
+        // Transform a single file using the script list
+        let mapSingleFile = inputFile =>
             readTextFile(inputFile)
                 .then(input => scripts.reduce((memo, fn) => fn(memo), input))
                 .then(replaceContent(inputFile));
 
-        let transformed = Promise.all(inputFiles.map(mapFile));
+        // Map from a list file name to a list of mapped single files.
+        let mapFileList = listFileName =>
+            readTextFile(listFileName)
+                .then(s => s.split(/[\r\n]+/))
+                .then(lines => lines.map(fn => path.dirname(listFileName) + '/' + fn.trim()));
 
+        // Map an input filename to either a single input file or
+        // a file list
+        let mapInputFileName = (outputs, inputFile) =>
+            outputs.concat(inputFile[0] === "@"
+                               ? mapFileList(inputFile.substr(1))
+                               : Promise.resolve([inputFile]))
+        //.then(vv => outputs.concat(vv));
+
+        let transformed = Promise.all(inputFiles.reduce(mapInputFileName, []))
+                                 .then(flatten)
+                                 .then(fns => Promise.all(fns.map(mapSingleFile)));
+        //let transformed = inputFiles.reduce(mapInputFileName, [])
+        //.then(fns => fns.map(mapSingleFile));
+
+        //console.log(inputFiles, transformed)
         return wrapAction(transformed);
     });
 
@@ -74,7 +101,7 @@ program
 
 function wrapAction(promise) {
     promise
-        .then(v => console.log("OK", v))
+        .then(v => console.log(JSON.stringify({ok:v}, null, "\t")))
         .catch(err => {
             console.error([err.name, err.message, err.toString()]);
             if (err.stack) {
