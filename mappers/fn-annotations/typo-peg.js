@@ -806,12 +806,12 @@ function peg$parse(input, options) {
               return "t.list(" + paren(v.substr(1,v.length - 2)) + ")";
 
            if (v[0] === "(")
-              return "t.tuple(" +
+              return "t.tuple([" +
                       v.substr(1,v.length - 2)
                       	.split(/\s*,\s*/)
                           .map(paren)
                           .join(', ')
-                          + ")";
+                          + "])";
 
            return v;
        }

@@ -69,8 +69,9 @@ function addToCode(code, options = {}) {
     let signatures = code.split(/[\r\n]+/)
                          .map(l => l.match(/^\s*\/\/(::.*)$/))
                          .filter(v => v !== null)
+                         .map(v => {console.log(v[1]); return v;})
                          .map(m => toString(fromString(m[1])))
-                         .join("\n");
+                         .join("\n\n");
 
     const prefix  = options.prefix || 'SIGNATURES>>>';
     const postfix = options.postfix || '<<<SIGNATURES';
